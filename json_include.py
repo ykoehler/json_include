@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 import os
@@ -23,32 +23,54 @@ def read_file(filepath):
 
 
 def get_include_name(value):
-    if isinstance(value, basestring):
+    if isinstance(value, str):
         rv = INCLUDE_VALUE_PATTERN.search(value)
         if rv:
             return rv.groups()[0]
     return None
 
 
+def is_include(o):
+    return set(o) == set([INCLUDE_KEY])
+
+
+def cache_include(include_name, dirpath):
+    if include_name:
+        if include_name not in _included_cache:
+            _included_cache[include_name] = parse_json_include(dirpath, include_name, True)
+
+
 def walk_through_to_include(o, dirpath):
     if isinstance(o, dict):
         is_include_exp = False
-        if set(o) == set([INCLUDE_KEY]):
-            include_name = get_include_name(o.values()[0])
-            if include_name:
-                is_include_exp = True
-                o.clear()
-                if include_name not in _included_cache:
-                    _included_cache[include_name] = parse_json_include(dirpath, include_name, True)
-                o.update(_included_cache[include_name])
+        if is_include(o):
+            include_name = get_include_name(list(o.values())[0])
+            cache_include(include_name, dirpath)
+            o.clear()
+            o.update(_included_cache[include_name])
+            is_include_exp = True
 
         if is_include_exp:
             return
 
-        for k, v in o.iteritems():
+        for k, v in o.items():
             if isinstance(v, OBJECT_TYPES):
                 walk_through_to_include(v, dirpath)
     elif isinstance(o, list):
+        is_include_exp = False
+        if len(o) == 1 and isinstance(o[0], dict):
+            i = o[0]
+            if is_include(i):
+                include_name = get_include_name(list(i.values())[0])
+                cache_include(include_name, dirpath)
+                if isinstance(_included_cache[include_name], list):
+                    is_include_exp = True
+                    o.clear()
+                    o.extend(_included_cache[include_name])
+
+        if is_include_exp:
+            return
+
         for i in o:
             if isinstance(i, OBJECT_TYPES):
                 walk_through_to_include(i, dirpath)
@@ -58,10 +80,6 @@ def parse_json_include(dirpath, filename, is_include=False):
     filepath = os.path.join(dirpath, filename)
     json_str = read_file(filepath)
     d = json.loads(json_str, object_pairs_hook=OrderedDict)
-
-    if is_include:
-        assert isinstance(d, dict),\
-            'The JSON file being included should always be a dict rather than a list'
 
     walk_through_to_include(d, dirpath)
 
@@ -113,7 +131,7 @@ def main():
 
     args = parser.parse_args()
 
-    print build_json_include(args.dirpath, args.filename)
+    print (build_json_include(args.dirpath, args.filename))
 
 
 if __name__ == '__main__':

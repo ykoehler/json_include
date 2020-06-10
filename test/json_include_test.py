@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
 import sys
@@ -28,5 +28,5 @@ def test_build_json_include():
 def run_build_json_include(dirpath, i):
     rv = build_json_include(dirpath, i)
     expect = read_file(os.path.join(_path('expect'), i))
-    print rv
+    print(rv)
     assert rv.strip() == expect.strip()
